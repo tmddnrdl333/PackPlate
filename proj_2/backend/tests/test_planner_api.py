@@ -93,12 +93,53 @@ def test_plan_never_mixes_locations(client, campus):
 
 
 def test_pools_meals_and_reports_each_dish_meal(client, campus):
-    oval = by_location(post(client, {"protein_goal_g": 60, "max_calories": 1000}))[
+    # 73 g needs all four labelled dishes (13 + 30 + 18 + 12), across both meals.
+    oval = by_location(post(client, {"protein_goal_g": 73, "max_calories": 1000}))[
         "On the Oval"
     ]
     meals = {i["name"]: i["meal"] for i in oval["items"]}
-    assert meals.get("Scrambled Eggs", "Breakfast") == "Breakfast"
-    assert set(meals.values()) <= {"Breakfast", "Lunch"}
+    assert meals == {
+        "Scrambled Eggs": "Breakfast",
+        "Grilled Chicken": "Lunch",
+        "Tofu Bowl": "Lunch",
+        "Cheese Pizza": "Lunch",
+    }
+    assert oval["status"] == "met"
+
+
+def test_dish_served_at_two_meals_is_planned_once(client, campus, seed):
+    seed.item(
+        62, "Scrambled Eggs", "6|eggs|1 each", allergens=["egg"], diets=["vegetarian"]
+    )
+    oval = by_location(post(client, {"protein_goal_g": 73, "max_calories": 1000}))[
+        "On the Oval"
+    ]
+    eggs = [i for i in oval["items"] if i["name"] == "Scrambled Eggs"]
+    assert len(eggs) == 1 and eggs[0]["meal"] == "Breakfast"
+    assert oval["candidates"] == 4 and oval["items_checked"] == 6
+
+
+def test_meal_names_are_trimmed(client, campus):
+    body = {"meals": ["  breakfast "], "protein_goal_g": 10, "max_calories": 1000}
+    oval = by_location(post(client, body))["On the Oval"]
+    assert [i["name"] for i in oval["items"]] == ["Scrambled Eggs"]
+
+
+def test_location_with_no_menus_gets_a_none_plan(client, campus, seed):
+    seed.location(9, "Tuffy's Diner", "tuffys")  # known, but no menu yet
+    plans = post(
+        client, {"protein_goal_g": 10, "max_calories": 1000}, location_id=9
+    ).json()
+    assert len(plans) == 1
+    assert plans[0]["status"] == "none" and plans[0]["items_checked"] == 0
+
+
+def test_calorie_limit_too_low_is_none_with_candidates(client, campus):
+    oval = by_location(post(client, {"protein_goal_g": 10, "max_calories": 50}))[
+        "On the Oval"
+    ]
+    assert oval["status"] == "none" and oval["items"] == []
+    assert oval["candidates"] == 4  # dishes fit; the limit is what rules them out
 
 
 def test_ranked_met_first_by_calories(client, campus):
@@ -224,6 +265,10 @@ def test_approved_label_review_removes_a_dish(client, campus, db):
         {"protein_goal_g": 10, "max_calories": 1000, "max_items": 0},
         {"protein_goal_g": 10, "max_calories": 1000, "max_items": 11},
         {"protein_goal_g": 10, "max_calories": 1000, "meals": []},
+        {"protein_goal_g": 10, "max_calories": 1000, "meals": [""]},
+        {"protein_goal_g": 10, "max_calories": 1000, "meals": ["   "]},
+        {"protein_goal_g": 10, "max_calories": 1000, "meals": ["x" * 51]},
+        {"protein_goal_g": 1000.5, "max_calories": 1000},
         {
             "protein_goal_g": 10,
             "max_calories": 1000,

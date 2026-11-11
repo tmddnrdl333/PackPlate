@@ -64,7 +64,9 @@ export function validatePlan(request: PlanRequest): string | null {
   return null;
 }
 
-// "84 of 100 g": how far a plan got toward the goal, for the summary line.
+// How far a plan got toward the goal, in whole percent. Rounded down, and a
+// plan that falls short never reads 100%.
 export function progress(plan: LocationPlan, goal: number): number {
-  return Math.min(100, Math.round((plan.protein_g / goal) * 100));
+  const percent = Math.floor((plan.protein_g / goal) * 100);
+  return plan.status === "met" ? 100 : Math.min(99, percent);
 }

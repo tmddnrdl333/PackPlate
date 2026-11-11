@@ -134,7 +134,10 @@ function PlannerForm({ saved }: { saved: Profile }) {
   const done = search.status === "done" ? search : null;
   const met = done?.plans.filter((p) => p.status === "met") ?? [];
   const short = done?.plans.filter((p) => p.status === "short") ?? [];
-  const best = met.length > 0 ? met : short.filter((p) => p.items.length > 0);
+  const best = met.length > 0 ? met : short;
+  const noMenus =
+    done !== null && done.plans.every((p) => p.items_checked === 0);
+  const someFit = done?.plans.some((p) => p.candidates > 0) ?? false;
 
   return (
     <>
@@ -186,7 +189,8 @@ function PlannerForm({ saved }: { saved: Profile }) {
                 className="input"
                 type="number"
                 inputMode="decimal"
-                min={1}
+                min={0}
+                step="any"
                 max={PLAN_LIMITS.protein_goal_g}
                 value={protein}
                 onChange={(event) => setProtein(event.target.value)}
@@ -199,7 +203,8 @@ function PlannerForm({ saved }: { saved: Profile }) {
                 className="input"
                 type="number"
                 inputMode="decimal"
-                min={1}
+                min={0}
+                step="any"
                 max={PLAN_LIMITS.max_calories}
                 value={calories}
                 onChange={(event) => setCalories(event.target.value)}
@@ -260,8 +265,11 @@ function PlannerForm({ saved }: { saved: Profile }) {
         {done ? (
           best.length === 0 ? (
             <StateMessage kind="empty">
-              No location has a dish that fits you with a full nutrition label
-              on this day. Try another day, or remove a restriction.
+              {noMenus
+                ? "No menus are loaded for this day yet. Try another day."
+                : someFit
+                  ? "Some dishes fit you, but none fits your calorie limit with any protein. Try a higher calorie limit."
+                  : "No location has a dish that fits you with a full nutrition label on this day. Try another day, or remove a restriction."}
             </StateMessage>
           ) : (
             <div className="page-body" style={{ marginTop: 0 }}>

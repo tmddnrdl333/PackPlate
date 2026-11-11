@@ -80,6 +80,15 @@ def names(result: Plan) -> list[str]:
         {"protein_g": 10, "max_calories": 100, "max_items": MAX_ITEMS_LIMIT + 1},
         {"protein_g": 10, "max_calories": 100, "avoid": frozenset({"peanuts"})},
         {"protein_g": 10, "max_calories": 100, "diets": frozenset({"keto"})},
+        # The API's limits hold for direct callers (the eval) too.
+        {"protein_g": 1000.1, "max_calories": 100},
+        {"protein_g": 10, "max_calories": 10000.1},
+        {"protein_g": math.inf, "max_calories": 100},
+        {"protein_g": math.nan, "max_calories": 100},
+        {"protein_g": 10, "max_calories": math.inf},
+        {"protein_g": 10, "max_calories": 100, "max_items": 2.5},
+        {"protein_g": 10, "max_calories": 100, "max_items": True},
+        {"protein_g": "10", "max_calories": 100},
     ],
 )
 def test_goal_rejects_bad_values(kw):
@@ -250,29 +259,59 @@ def test_same_name_different_serving_are_different_dishes():
     assert result.status == MET and len(result.items) == 2
 
 
-def test_fractional_protein_never_overstates_the_total():
-    # 3 x 16.7 = 50.1 real grams, but floored to 48: the planner can't claim 50.
+def test_tenths_of_a_gram_add_up_to_the_goal():
+    # 3 x 16.7 = 50.1 g really meets 50 g (whole-gram rounding would say 48).
     menu = [dish(f"D{i}", 16.7, 100) for i in range(3)]
     result = plan(menu, goal(50, 1000))
-    assert result.status == SHORT
+    assert result.status == MET
     assert result.protein_g == pytest.approx(50.1)
 
 
+def test_halves_add_up_to_the_goal():
+    result = plan([dish("A", 5.5, 10), dish("B", 4.5, 10)], goal(10, 100))
+    assert result.status == MET and result.protein_g == 10
+
+
+def test_dishes_under_one_gram_still_count():
+    result = plan([dish("A", 0.6, 5), dish("B", 0.6, 5)], goal(1, 100))
+    assert result.status == MET and len(result.items) == 2
+    assert plan([dish("C", 0.8, 5)], goal(0.5, 100)).status == MET
+
+
+def test_status_follows_the_real_total_for_finer_labels():
+    # 3 x 3.34 = 10.02 g: rounded down to tenths it's 9.9, but it really meets 10.
+    result = plan([dish(f"D{i}", 3.34, 10) for i in range(3)], goal(10, 100))
+    assert result.status == MET and result.protein_g >= 10
+
+
 def test_met_plan_real_total_is_never_below_goal():
-    menu = [dish(f"D{i}", 10.9, 90) for i in range(8)]
-    result = plan(menu, goal(43.2, 1000))
-    assert result.status == MET and result.protein_g >= 43.2
+    menu = [dish(f"D{i}", 10.94, 90) for i in range(8)]
+    result = plan(menu, goal(43.25, 1000))
+    assert result.status == MET and result.protein_g >= 43.25
 
 
 def test_fractional_goal_rounds_up():
-    result = plan([dish("A", 50, 100)], goal(50.5, 1000))
-    assert result.status == SHORT
+    assert plan([dish("A", 50.4, 100)], goal(50.5, 1000)).status == SHORT
+    assert plan([dish("B", 50.5, 100)], goal(50.5, 1000)).status == MET
 
 
 def test_zero_protein_dishes_never_fill_a_plan():
-    menu = [dish("Water", 0, 0), dish("Lettuce", 0.4, 5), dish("Chicken", 30, 200)]
+    menu = [dish("Water", 0, 0), dish("Lettuce", 0.04, 5), dish("Chicken", 30, 200)]
     result = plan(menu, goal(20, 1000))
     assert names(result) == ["Chicken"]
+
+
+def test_short_plan_prefers_more_real_protein():
+    # Two 4.9 g dishes (9.8 g) beat one 9.0 g dish within 500 calories.
+    menu = [dish("A", 4.9, 10), dish("B", 4.9, 10), dish("Big", 9.0, 495)]
+    result = plan(menu, goal(20, 500))
+    assert result.status == SHORT and names(result) == ["A", "B"]
+
+
+def test_nan_label_is_never_planned():
+    odd = dish("Odd", protein=30)
+    odd.nutrition.protein_g = math.nan
+    assert plan([odd], goal(10)) == Plan(NONE)
 
 
 def test_short_plan_maximises_protein_within_limits():
@@ -282,9 +321,16 @@ def test_short_plan_maximises_protein_within_limits():
     assert names(result) == ["B", "C"] and result.protein_g == 27
 
 
-def test_short_when_every_dish_is_over_the_limit():
+def test_none_when_every_safe_dish_is_over_the_limit():
+    # Something fits the student, but nothing can be planned: "none", and
+    # candidates says why (the page tells them to raise the limit).
     result = plan([dish("Feast", 80, 3000)], goal(50, 1000))
-    assert result.status == SHORT and result.items == [] and result.candidates == 1
+    assert result.status == NONE and result.items == [] and result.candidates == 1
+
+
+def test_short_plans_always_have_dishes():
+    result = plan([dish("Small", 5, 100)], goal(50, 1000))
+    assert result.status == SHORT and names(result) == ["Small"]
 
 
 def test_none_when_no_dishes():
@@ -313,20 +359,46 @@ def test_same_input_gives_same_plan():
         assert names(plan(menu, g)) == names(first)
 
 
-def test_matches_brute_force_on_small_menus():
-    """The DP finds the same calories as trying every combination."""
-    menu = [dish(f"D{i}", 3 + (i * 11) % 29, 60 + (i * 53) % 400) for i in range(10)]
-    g = goal(70, 900, max_items=4)
-    best = None
-    for k in range(1, 5):
+def _brute_force(menu, g):
+    """Every combination, judged on real totals: (met?, best key) like the planner."""
+    met, short = None, None
+    for k in range(1, g.max_items + 1):
         for combo in itertools.combinations(menu, k):
-            protein = sum(math.floor(d.nutrition.protein_g) for d in combo)
+            protein = sum(d.nutrition.protein_g for d in combo)
             cal = sum(d.nutrition.calories for d in combo)
-            if protein >= 70 and cal <= 900 and (best is None or cal < best):
-                best = cal
+            if cal > g.max_calories:
+                continue
+            if protein >= g.protein_g:
+                key = (cal, k)
+                met = key if met is None or key < met else met
+            else:
+                key = (-round(protein, 6), cal, k)
+                short = key if short is None or key < short else short
+    return met, short
+
+
+@pytest.mark.parametrize("seed", range(12))
+def test_matches_brute_force_on_small_menus(seed):
+    """On tenth-of-a-gram labels, the DP finds what trying every combination finds."""
+    menu = [
+        dish(
+            f"D{i}",
+            round(0.3 + ((i * 7 + seed * 13) % 290) / 10, 1),  # 0.3..29.2 g
+            40 + (i * 53 + seed * 31) % 400,
+        )
+        for i in range(9)
+    ]
+    # These 12 seeds give 4 "met" and 8 "short" cases, so both branches are checked.
+    g = goal(15 + seed * 4, 400 + seed * 50, max_items=2 + seed % 3)
+    met, short = _brute_force(menu, g)
     result = plan(menu, g)
-    assert best is not None and result.status == MET
-    assert result.calories == best
+    if met is not None:
+        assert result.status == MET
+        assert (result.calories, len(result.items)) == met
+    else:
+        assert result.status == SHORT
+        assert result.protein_g == pytest.approx(-short[0])
+        assert (result.calories, len(result.items)) == short[1:]
 
 
 def test_candidates_dedupes_and_keeps_order():

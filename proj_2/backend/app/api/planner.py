@@ -44,20 +44,34 @@ def plan_day(
 
     Ranked: plans that meet the goal (fewest calories first), then plans that
     fall short (most protein first), then locations with nothing to plan.
-    With `location_id`, only that location (404 if it doesn't exist).
+    With `location_id`, only that location (404 if it doesn't exist; a known
+    location with no menu that day gets a "none" plan).
     """
-    if location_id is not None and locations_repo.get_location(db, location_id) is None:
-        raise HTTPException(status_code=404, detail=f"location {location_id} not found")
+    if location_id is None:
+        locations = locations_repo.list_locations(db)
+    else:
+        # Any known location, even one that hasn't published a menu yet ("none").
+        location = locations_repo.get_location(db, location_id)
+        if location is None:
+            raise HTTPException(
+                status_code=404, detail=f"location {location_id} not found"
+            )
+        locations = [location]
     day = on or campus_time().date()
     goal = _goal(request)
     wanted = {m.casefold() for m in request.meals} if request.meals else None
     approved = reviews_repo.approved(db)
+    menus = (
+        menus_repo.all_menus_on(db, day)
+        if location_id is None
+        else menus_repo.menus_on(db, location_id, day)
+    )
 
     # Each location's dishes in menu order (breakfast before lunch...), and
-    # which meal each dish is served at.
+    # which meal each dish is served at (the first, if it's served at several).
     dishes: dict[int, list] = {}
     meal_of: dict[int, str] = {}
-    for menu in sorted(menus_repo.all_menus_on(db, day), key=menu_sort_key):
+    for menu in sorted(menus, key=menu_sort_key):
         if wanted is not None and menu.meal.casefold() not in wanted:
             continue
         for item in reviewed_items(menu, approved):
@@ -65,9 +79,7 @@ def plan_day(
             meal_of[item.id] = menu.meal
 
     results = []
-    for location in locations_repo.list_locations(db):
-        if location_id is not None and location.id != location_id:
-            continue
+    for location in locations:
         items = dishes.get(location.id, [])
         result = planner.plan(items, goal)
         results.append((location.name, result, location.id, len(items)))

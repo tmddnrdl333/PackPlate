@@ -21,11 +21,13 @@ The search
     "met":   protein >= goal and calories <= limit. Among those, the fewest
              calories, then the fewest dishes.
     "short": no plan meets the goal; the most protein that fits the calorie
-             limit and dish cap instead.
-    "none":  no candidate dish at all (nothing safe with usable nutrition).
-    Protein is counted in whole grams rounded down, so a "met" plan's real
-    total is never below the goal. Ties break on input order, so the same
-    input always gives the same plan.
+             limit and dish cap instead (then fewest calories, fewest dishes).
+    "none":  nothing to plan: no dish fits the student with a usable label, or
+             none of those fits the calorie limit with any protein at all.
+    Protein is counted in tenths of a gram, rounded down (NC State labels use
+    whole or tenth grams), and the goal is rounded up, so a "met" plan's real
+    total is never below the goal. The search is deterministic: the same input
+    always gives the same plan.
 """
 
 import math
@@ -37,6 +39,15 @@ from app.services.label_reviews import dish_name
 MET, SHORT, NONE = "met", "short", "none"
 DEFAULT_MAX_ITEMS = 6
 MAX_ITEMS_LIMIT = 10
+MAX_PROTEIN_G = 1000  # same limits as the API (schemas/planner.py)
+MAX_CALORIES = 10000
+UNITS_PER_GRAM = 10  # protein is searched in tenths of a gram
+
+
+def _units(protein_g: float, up: bool = False) -> int:
+    """Protein in tenths of a gram, rounded down (or up), ignoring float noise like 16.700000001."""
+    tenths = round(protein_g * UNITS_PER_GRAM, 6)
+    return math.ceil(tenths) if up else math.floor(tenths)
 
 
 @dataclass(frozen=True)
@@ -50,14 +61,28 @@ class Goal:
     max_items: int = DEFAULT_MAX_ITEMS  # at most this many dishes
 
     def __post_init__(self):
-        if not self.protein_g > 0:
-            raise ValueError("protein_g must be > 0")
-        if not self.max_calories > 0:
-            raise ValueError("max_calories must be > 0")
-        if not 1 <= self.max_items <= MAX_ITEMS_LIMIT:
-            raise ValueError(f"max_items must be 1..{MAX_ITEMS_LIMIT}")
-        unknown = (self.avoid - set(filter_engine.ALLERGEN_KEYS)) | (
-            self.diets - set(filter_engine.DIET_KEYS)
+        # The same limits the API enforces, so code that skips the API (the
+        # eval) can't ask for an impossible or enormous search.
+        if not (
+            isinstance(self.protein_g, int | float)
+            and math.isfinite(self.protein_g)
+            and 0 < self.protein_g <= MAX_PROTEIN_G
+        ):
+            raise ValueError(f"protein_g must be > 0 and <= {MAX_PROTEIN_G}")
+        if not (
+            isinstance(self.max_calories, int | float)
+            and math.isfinite(self.max_calories)
+            and 0 < self.max_calories <= MAX_CALORIES
+        ):
+            raise ValueError(f"max_calories must be > 0 and <= {MAX_CALORIES}")
+        if (
+            not isinstance(self.max_items, int)
+            or isinstance(self.max_items, bool)
+            or not 1 <= self.max_items <= MAX_ITEMS_LIMIT
+        ):
+            raise ValueError(f"max_items must be a whole number 1..{MAX_ITEMS_LIMIT}")
+        unknown = (frozenset(self.avoid) - set(filter_engine.ALLERGEN_KEYS)) | (
+            frozenset(self.diets) - set(filter_engine.DIET_KEYS)
         )
         if unknown:
             raise ValueError(f"unknown allergen or diet: {sorted(unknown)}")
@@ -82,8 +107,8 @@ def safety_profile(goal: Goal) -> filter_engine.Profile:
     dish with no label or a placeholder label comes back "incomplete".
     """
     return filter_engine.Profile(
-        avoid=goal.avoid,
-        diets=goal.diets,
+        avoid=frozenset(goal.avoid),
+        diets=frozenset(goal.diets),
         min_protein_g=0,
         max_calories=math.inf,
     )
@@ -98,6 +123,13 @@ def dish_key(item) -> tuple[str, str]:
     return (dish_name(item.name), dish_name(serving))
 
 
+def _usable_numbers(item) -> bool:
+    # check() already demands both numbers exist; this also rules out a NaN or
+    # infinite value, which would slip past its comparisons.
+    label = item.nutrition
+    return math.isfinite(label.protein_g) and math.isfinite(label.calories)
+
+
 def candidates(items, goal: Goal) -> list:
     """The dishes a plan may use, in input order: safe, usable nutrition, one per dish."""
     profile = safety_profile(goal)
@@ -108,6 +140,8 @@ def candidates(items, goal: Goal) -> list:
         if key in seen:
             continue
         if filter_engine.check(item, profile).verdict != filter_engine.FITS:
+            continue
+        if not _usable_numbers(item):
             continue
         seen.add(key)
         out.append(item)
@@ -124,21 +158,22 @@ def _totals(items) -> tuple[float, float]:
 def plan(items, goal: Goal) -> Plan:
     """The best plan from one location's dishes for one day (see the module docstring)."""
     pool = candidates(items, goal)
-    if not pool:
-        return Plan(NONE)
-
-    target = math.ceil(goal.protein_g)  # whole grams; protein is floored below
+    target = _units(goal.protein_g, up=True)
     k_max = goal.max_items
-    # Dishes that can't help: over the limit alone, or under 1 g of protein
+    # Dishes that can't help: over the limit alone, or no protein at all
     # (they only add calories, so the best plan never needs them).
     usable = [
-        (i, math.floor(i.nutrition.protein_g), i.nutrition.calories)
+        (i, _units(i.nutrition.protein_g), i.nutrition.calories)
         for i in pool
-        if i.nutrition.calories <= goal.max_calories and i.nutrition.protein_g >= 1
+        if i.nutrition.calories <= goal.max_calories
+        and _units(i.nutrition.protein_g) > 0
     ]
+    if not usable:
+        return Plan(NONE, candidates=len(pool))
 
-    # best[k][p] = (calories, picks) for exactly k dishes whose floored protein,
-    # capped at target, is p. Fewest calories wins; ties keep the earlier picks.
+    # best[k][p] = (calories, picks) for exactly k dishes whose protein (in
+    # tenths, rounded down, capped at target) is p. Fewest calories wins; on a
+    # tie the combination found first is kept, so the result is deterministic.
     best: list[list[tuple[float, tuple[int, ...]] | None]] = [
         [None] * (target + 1) for _ in range(k_max + 1)
     ]
@@ -161,21 +196,21 @@ def plan(items, goal: Goal) -> Plan:
     if met:
         # Fewest calories, then fewest dishes (k is the tuple length).
         chosen = min(met, key=lambda s: (s[0], len(s[1])))
-        status = MET
     else:
+        # Every usable dish fits the limit alone, so something is reachable.
         reachable = [
             (p, s) for k in range(1, k_max + 1) for p, s in enumerate(best[k]) if s
         ]
-        if not reachable:
-            return Plan(SHORT, candidates=len(pool))
         top = max(p for p, _ in reachable)
         chosen = min(
             (s for p, s in reachable if p == top), key=lambda s: (s[0], len(s[1]))
         )
-        status = SHORT
 
-    picked = [usable[i][0] for i in chosen[1]]
+    picked = [usable[i][0] for i in sorted(chosen[1])]
     protein, calories = _totals(picked)
+    # The status always matches the real total, even for labels finer than a
+    # tenth of a gram.
+    status = MET if met or protein >= goal.protein_g else SHORT
     return Plan(status, picked, protein, calories, len(pool))
 
 

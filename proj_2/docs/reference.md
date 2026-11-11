@@ -218,7 +218,8 @@ A one-location meal plan for `date` (default today) at every location, best firs
 
 Ranked: plans that meet the goal (fewest calories first), then plans that
 fall short (most protein first), then locations with nothing to plan.
-With `location_id`, only that location (404 if it doesn't exist).
+With `location_id`, only that location (404 if it doesn't exist; a known
+location with no menu that day gets a "none" plan).
 
 ## `app.deps`
 
@@ -657,7 +658,7 @@ Fields:
 - `protein_goal_g: float`
 - `max_calories: float`
 - `max_items: int`
-- `meals: list[str] | None`
+- `meals: list[MealName] | None`
 
 ### class `PlannedItem` (MenuItem)
 
@@ -1006,11 +1007,13 @@ The search
     "met":   protein >= goal and calories <= limit. Among those, the fewest
              calories, then the fewest dishes.
     "short": no plan meets the goal; the most protein that fits the calorie
-             limit and dish cap instead.
-    "none":  no candidate dish at all (nothing safe with usable nutrition).
-    Protein is counted in whole grams rounded down, so a "met" plan's real
-    total is never below the goal. Ties break on input order, so the same
-    input always gives the same plan.
+             limit and dish cap instead (then fewest calories, fewest dishes).
+    "none":  nothing to plan: no dish fits the student with a usable label, or
+             none of those fits the calorie limit with any protein at all.
+    Protein is counted in tenths of a gram, rounded down (NC State labels use
+    whole or tenth grams), and the goal is rounded up, so a "met" plan's real
+    total is never below the goal. The search is deterministic: the same input
+    always gives the same plan.
 ```
 
 ### class `Goal`

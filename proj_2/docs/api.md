@@ -126,7 +126,8 @@ A one-location meal plan for `date` (default today) at every location, best firs
 
 Ranked: plans that meet the goal (fewest calories first), then plans that
 fall short (most protein first), then locations with nothing to plan.
-With `location_id`, only that location (404 if it doesn't exist).
+With `location_id`, only that location (404 if it doesn't exist; a known
+location with no menu that day gets a "none" plan).
 
 | Parameter | In | Type | Required | Default |
 |---|---|---|---|---|
