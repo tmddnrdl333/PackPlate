@@ -4,7 +4,7 @@
 
 Every public module, class, and function in the Python code, with its signature and description, read from the source. The website (`frontend/`) is described in [how.md](how.md) instead.
 
-**259 of 259** modules, classes, and functions have a description.
+**273 of 273** modules, classes, and functions have a description.
 
 - **API** (`backend/app/`)
   - [`app`](#app)
@@ -13,6 +13,7 @@ Every public module, class, and function in the Python code, with its signature 
   - [`app.api.filters`](#appapifilters)
   - [`app.api.locations`](#appapilocations)
   - [`app.api.meta`](#appapimeta)
+  - [`app.api.planner`](#appapiplanner)
   - [`app.deps`](#appdeps)
   - [`app.main`](#appmain)
   - [`app.repositories`](#apprepositories)
@@ -26,6 +27,7 @@ Every public module, class, and function in the Python code, with its signature 
   - [`app.schemas.filters`](#appschemasfilters)
   - [`app.schemas.locations`](#appschemaslocations)
   - [`app.schemas.meta`](#appschemasmeta)
+  - [`app.schemas.planner`](#appschemasplanner)
   - [`app.services`](#appservices)
   - [`app.services.crowd`](#appservicescrowd)
   - [`app.services.filter_engine`](#appservicesfilter_engine)
@@ -33,6 +35,7 @@ Every public module, class, and function in the Python code, with its signature 
   - [`app.services.hours`](#appserviceshours)
   - [`app.services.label_reviews`](#appserviceslabel_reviews)
   - [`app.services.menus`](#appservicesmenus)
+  - [`app.services.planner`](#appservicesplanner)
 - **Database** (`db/`)
   - [`db`](#db)
   - [`db.migrate`](#dbmigrate)
@@ -194,6 +197,28 @@ def freshness(at: datetime | None=None, db: Session=Depends(get_db))
 ```
 
 When ingestion last finished, and whether the data is stale at `at` (default now).
+
+## `app.api.planner`
+
+Source: [`backend/app/api/planner.py`](../backend/app/api/planner.py)
+
+Daily meal planner route (Project 3, M2).
+
+Thin: loads the day's menus (with approved label reviews applied, exactly as
+the filter routes do) and hands each location's dishes to services/planner.py.
+
+### `plan_day`
+
+```python
+@router.post('/day', response_model=list[LocationPlan])
+def plan_day(request: PlanRequest, on: date | None=Query(None, alias='date'), location_id: int | None=None, db: Session=Depends(get_db))
+```
+
+A one-location meal plan for `date` (default today) at every location, best first.
+
+Ranked: plans that meet the goal (fewest calories first), then plans that
+fall short (most protein first), then locations with nothing to plan.
+With `location_id`, only that location (404 if it doesn't exist).
 
 ## `app.deps`
 
@@ -612,6 +637,52 @@ Fields:
 - `stale: bool`
 - `stale_after_hours: int`
 
+## `app.schemas.planner`
+
+Source: [`backend/app/schemas/planner.py`](../backend/app/schemas/planner.py)
+
+Request and response models for the daily meal planner (Project 3, M2).
+
+Like the filter endpoints, the request is checked strictly: an unknown field,
+allergen, or diet is rejected (422), never ignored, and nothing is stored.
+
+### class `PlanRequest` (BaseModel)
+
+One student's day: allergens and diets (as in a filter profile) plus daily goals.
+
+Fields:
+
+- `avoid: list[Allergen]`
+- `diets: list[Diet]`
+- `protein_goal_g: float`
+- `max_calories: float`
+- `max_items: int`
+- `meals: list[str] | None`
+
+### class `PlannedItem` (MenuItem)
+
+A dish in a plan: the menu item, plus which meal it is served at.
+
+Fields:
+
+- `meal: str`
+
+### class `LocationPlan` (BaseModel)
+
+The planner's answer for one location on one day.
+
+Fields:
+
+- `location_id: int`
+- `location_name: str`
+- `date: date`
+- `status: Literal['met', 'short', 'none']`
+- `items: list[PlannedItem]`
+- `protein_g: float`
+- `calories: float`
+- `candidates: int`
+- `items_checked: int`
+
 ## `app.services`
 
 Source: [`backend/app/services/__init__.py`](../backend/app/services/__init__.py)
@@ -906,6 +977,111 @@ def menu_sort_key(menu)
 ```
 
 Sort key for menus: by date, then by meal in MEAL_ORDER, then other meals by name.
+
+## `app.services.planner`
+
+Source: [`backend/app/services/planner.py`](../backend/app/services/planner.py)
+
+```text
+Daily meal planner (Project 3, M2). Pure functions, no database.
+
+Given one student's needs and one location's menus for one day, pick a set of
+dishes that reaches a daily protein goal without going over a calorie limit.
+
+The rules (spec: proj_2/docs/p3-m2-meal-planner.md):
+
+Safety, inherited from filter_engine (never second-guessed here)
+    a dish is a candidate only if filter_engine.check() says "fits" for the
+    student's allergens and diets, AND its label has usable protein and
+    calories (no label, a placeholder label, or a nutrient NC State flags as
+    incomplete makes it "incomplete", so it is never planned)
+One location per plan
+    a plan never mixes locations. Stations inside one location (On the Oval's
+    Flashpoint and Fahrenheit) are the same location, so they mix freely.
+    All of that location's meals that day are pooled, unless `meals` narrows it.
+Same dish twice
+    the same dish served at two meals (same name and serving size) counts once
+The search
+    0/1 knapsack, at most `max_items` dishes, each at most once.
+    "met":   protein >= goal and calories <= limit. Among those, the fewest
+             calories, then the fewest dishes.
+    "short": no plan meets the goal; the most protein that fits the calorie
+             limit and dish cap instead.
+    "none":  no candidate dish at all (nothing safe with usable nutrition).
+    Protein is counted in whole grams rounded down, so a "met" plan's real
+    total is never below the goal. Ties break on input order, so the same
+    input always gives the same plan.
+```
+
+### class `Goal`
+
+One student's day: who they are (allergens, diets) and what they want to reach.
+
+Fields:
+
+- `protein_g: float`
+- `max_calories: float`
+- `avoid: frozenset[str]`
+- `diets: frozenset[str]`
+- `max_items: int`
+
+### class `Plan`
+
+The planner's answer for one location on one day.
+
+Fields:
+
+- `status: str`
+- `items: list`
+- `protein_g: float`
+- `calories: float`
+- `candidates: int`
+
+### `safety_profile`
+
+```python
+def safety_profile(goal: Goal) -> filter_engine.Profile
+```
+
+The filter_engine profile a dish must "fit" to be planned.
+
+min_protein_g=0 and max_calories=inf never reject a dish on their own;
+they make filter_engine demand a usable protein and calorie number, so a
+dish with no label or a placeholder label comes back "incomplete".
+
+### `dish_key`
+
+```python
+def dish_key(item) -> tuple[str, str]
+```
+
+Two menu rows are the same dish if name and serving size match.
+
+Names are matched the way label reviews match them (label_reviews.dish_name).
+
+### `candidates`
+
+```python
+def candidates(items, goal: Goal) -> list
+```
+
+The dishes a plan may use, in input order: safe, usable nutrition, one per dish.
+
+### `plan`
+
+```python
+def plan(items, goal: Goal) -> Plan
+```
+
+The best plan from one location's dishes for one day (see the module docstring).
+
+### `rank_key`
+
+```python
+def rank_key(location_name: str, result: Plan)
+```
+
+Sort order across locations: met (fewest calories), then short (most protein), then none.
 
 # Database: `db/`
 
