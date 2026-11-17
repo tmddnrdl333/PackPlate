@@ -89,6 +89,8 @@ def names(result: Plan) -> list[str]:
         {"protein_g": 10, "max_calories": 100, "max_items": 2.5},
         {"protein_g": 10, "max_calories": 100, "max_items": True},
         {"protein_g": "10", "max_calories": 100},
+        {"protein_g": True, "max_calories": 100},  # a bool is not a number here
+        {"protein_g": 10, "max_calories": True},
     ],
 )
 def test_goal_rejects_bad_values(kw):
@@ -312,6 +314,23 @@ def test_nan_label_is_never_planned():
     odd = dish("Odd", protein=30)
     odd.nutrition.protein_g = math.nan
     assert plan([odd], goal(10)) == Plan(NONE)
+
+
+@pytest.mark.parametrize("field", ["calories", "protein_g"])
+def test_negative_label_values_are_never_planned(field):
+    # filter_engine lets -300 kcal through (it only checks "not over the
+    # limit"); a negative label would make a plan look lighter than it is.
+    odd = dish("Typo", protein=30, calories=200)
+    setattr(odd.nutrition, field, -300)
+    normal = dish("Normal", protein=30, calories=300)
+    result = plan([odd, normal], goal(40, 300))
+    assert names(result) == ["Normal"] and result.calories == 300
+    assert result.candidates == 1
+
+
+def test_zero_calorie_dish_is_still_allowed():
+    result = plan([dish("Broth", protein=5, calories=0)], goal(5, 100))
+    assert result.status == MET and result.calories == 0
 
 
 def test_short_plan_maximises_protein_within_limits():

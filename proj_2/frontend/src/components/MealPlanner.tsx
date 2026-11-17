@@ -3,7 +3,7 @@
 // Plan My Day (Project 3, M2). Allergies and diets start from the saved
 // profile (My diet); the daily goals live only on this page.
 import Link from "next/link";
-import { useState, type FormEvent } from "react";
+import { useRef, useState, type FormEvent } from "react";
 import { api, errorMessage } from "@/lib/api";
 import { ALLERGENS, DIETS } from "@/lib/diet";
 import { formatNumber } from "@/lib/format";
@@ -106,6 +106,15 @@ function PlannerForm({ saved }: { saved: Profile }) {
   const [date, setDate] = useState<string>("");
   const [problem, setProblem] = useState<string | null>(null);
   const [search, setSearch] = useState<Search>({ status: "idle" });
+  // Bumped on every edit and every submit. A plan is only shown if nothing
+  // changed since it was asked for, so it can never be read as the plan for
+  // allergies or goals the student has since changed.
+  const requestId = useRef(0);
+
+  function edited() {
+    requestId.current += 1;
+    setSearch({ status: "idle" });
+  }
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -122,11 +131,14 @@ function PlannerForm({ saved }: { saved: Profile }) {
       return;
     }
     setProblem(null);
+    const id = ++requestId.current;
     setSearch({ status: "loading" });
     try {
       const plans = await api.planDay(body, date || undefined);
+      if (id !== requestId.current) return; // inputs changed meanwhile
       setSearch({ status: "done", plans, goal: body.protein_goal_g });
     } catch (error) {
+      if (id !== requestId.current) return;
       setSearch({ status: "error", message: errorMessage(error) });
     }
   }
@@ -150,9 +162,10 @@ function PlannerForm({ saved }: { saved: Profile }) {
                 <input
                   type="checkbox"
                   checked={avoid.includes(allergen.key)}
-                  onChange={() =>
-                    setAvoid((list) => toggle(list, allergen.key))
-                  }
+                  onChange={() => {
+                    setAvoid((list) => toggle(list, allergen.key));
+                    edited();
+                  }}
                 />
                 <span>{allergen.label}</span>
               </label>
@@ -168,7 +181,10 @@ function PlannerForm({ saved }: { saved: Profile }) {
                 <input
                   type="checkbox"
                   checked={diets.includes(diet.key)}
-                  onChange={() => setDiets((list) => toggle(list, diet.key))}
+                  onChange={() => {
+                    setDiets((list) => toggle(list, diet.key));
+                    edited();
+                  }}
                 />
                 <span>{diet.label}</span>
               </label>
@@ -193,7 +209,10 @@ function PlannerForm({ saved }: { saved: Profile }) {
                 step="any"
                 max={PLAN_LIMITS.protein_goal_g}
                 value={protein}
-                onChange={(event) => setProtein(event.target.value)}
+                onChange={(event) => {
+                  setProtein(event.target.value);
+                  edited();
+                }}
               />
             </div>
             <div className="field">
@@ -207,7 +226,10 @@ function PlannerForm({ saved }: { saved: Profile }) {
                 step="any"
                 max={PLAN_LIMITS.max_calories}
                 value={calories}
-                onChange={(event) => setCalories(event.target.value)}
+                onChange={(event) => {
+                  setCalories(event.target.value);
+                  edited();
+                }}
               />
             </div>
             <div className="field">
@@ -220,7 +242,10 @@ function PlannerForm({ saved }: { saved: Profile }) {
                 min={1}
                 max={PLAN_LIMITS.max_items}
                 value={maxItems}
-                onChange={(event) => setMaxItems(event.target.value)}
+                onChange={(event) => {
+                  setMaxItems(event.target.value);
+                  edited();
+                }}
               />
             </div>
             <div className="field">
@@ -230,7 +255,10 @@ function PlannerForm({ saved }: { saved: Profile }) {
                 className="input"
                 type="date"
                 value={date}
-                onChange={(event) => setDate(event.target.value)}
+                onChange={(event) => {
+                  setDate(event.target.value);
+                  edited();
+                }}
               />
             </div>
           </div>

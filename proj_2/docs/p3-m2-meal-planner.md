@@ -1,9 +1,9 @@
 # Project 3 · M2 — Daily meal planner
 
-**Status (2026-11-11):** backend, website page, and tests built on branch
-`m2-meal-planner` (GitHub: tmddnrdl333). Revised the same day after an
-independent code review (fractional protein, `Goal` limits, the `none` status,
-`meals` validation). This is **new Project 3 work** on top of
+**Status (2026-11-17):** done and merged into `main` (PR #1). Revised after
+two independent reviews: fractional protein, `Goal` limits, the `none` status,
+`meals` validation (PR #1), then negative label values, stale plans on the
+page, and booleans as goals (PR #2). This is **new Project 3 work** on top of
 the forked PackPlate (fork point: tag `fork-point`); no original file's logic
 was changed.
 
@@ -45,8 +45,8 @@ day's plan that reaches the goal, using only dishes PackPlate already says
      from the plan's real totals, so it can never disagree with them.
    - Dishes with no protein, or over the calorie limit on their own, are
      skipped: they can never help.
-   - Cost: dishes × `max_items` × goal × 10. A full campus day (24 locations)
-     takes ~0.3–0.7 s on a laptop for usual goals; the largest request the API
+   - Cost: dishes × `max_items` × goal × 10. A full campus day on live data
+     (24 locations) takes ~0.3–0.7 s on a laptop for usual goals; the largest request the API
      allows (1000 g, 10 dishes) takes ~2 s.
 3. **Deterministic:** the same input always gives the same plan.
 
@@ -177,6 +177,9 @@ are drawn and what counts as a pass.
 
 ## Website
 
+Changing any input clears the shown plans (and a reply that arrives after an
+edit is dropped), so a plan on screen always matches the settings above it.
+
 `/planner` ("Plan my day" in the header): allergies and diets (pre-filled from
 My diet, not saved back), protein goal, calorie limit, most dishes, and an
 optional day. Shows the top 3 plans in full — each dish with its meal,
@@ -185,12 +188,13 @@ If no location meets the goal, it shows the closest plans and says so.
 
 ## Tests
 
-`backend/tests/test_planner.py` (68, no database) and
-`backend/tests/test_planner_api.py` (32, test database): **100 new tests**. They cover:
+`backend/tests/test_planner.py` (73, no database) and
+`backend/tests/test_planner_api.py` (33, test database): **106 new tests**
+(counting each parametrized case). They cover:
 
 - **Safety:** avoided allergens, untagged diets, vegan-counts-as-vegetarian,
   unrecognized traits, ingredient flags doubting a tag, no label, missing,
-  flagged, or NaN protein/calories, placeholder labels, approved label
+  flagged, NaN, or negative protein/calories, placeholder labels, approved label
   reviews — and a check that every planned dish is `fits`.
 - **Search:** meets goal under the limit, fewest calories, fewer dishes on a
   tie, calorie limit inclusive, `max_items`, each dish once, same dish at two

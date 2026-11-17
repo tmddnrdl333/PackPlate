@@ -168,6 +168,16 @@ def test_diet_limits_dishes_to_tagged_ones(client, campus):
     assert [i["name"] for i in oval["items"]] == ["Tofu Bowl"]
 
 
+def test_negative_calorie_label_is_never_planned(client, campus, seed):
+    seed.nutrition("6|typo|1 each", location_id=6, protein_g=40, calories=-300)
+    seed.item(62, "Typo Wrap", "6|typo|1 each")
+    oval = by_location(post(client, {"protein_goal_g": 30, "max_calories": 300}))[
+        "On the Oval"
+    ]
+    assert "Typo Wrap" not in [i["name"] for i in oval["items"]]
+    assert oval["calories"] >= 0 and oval["candidates"] == 4
+
+
 def test_unlabelled_dish_never_planned_and_counts(client, campus):
     oval = by_location(post(client, {"protein_goal_g": 500, "max_calories": 10000}))[
         "On the Oval"
