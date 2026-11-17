@@ -995,7 +995,8 @@ Safety, inherited from filter_engine (never second-guessed here)
     a dish is a candidate only if filter_engine.check() says "fits" for the
     student's allergens and diets, AND its label has usable protein and
     calories (no label, a placeholder label, or a nutrient NC State flags as
-    incomplete makes it "incomplete", so it is never planned)
+    incomplete makes it "incomplete", so it is never planned; NaN, infinite,
+    or negative numbers are never planned either)
 One location per plan
     a plan never mixes locations. Stations inside one location (On the Oval's
     Flashpoint and Fahrenheit) are the same location, so they mix freely.

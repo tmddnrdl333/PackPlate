@@ -9,7 +9,8 @@ Safety, inherited from filter_engine (never second-guessed here)
     a dish is a candidate only if filter_engine.check() says "fits" for the
     student's allergens and diets, AND its label has usable protein and
     calories (no label, a placeholder label, or a nutrient NC State flags as
-    incomplete makes it "incomplete", so it is never planned)
+    incomplete makes it "incomplete", so it is never planned; NaN, infinite,
+    or negative numbers are never planned either)
 One location per plan
     a plan never mixes locations. Stations inside one location (On the Oval's
     Flashpoint and Fahrenheit) are the same location, so they mix freely.
@@ -44,6 +45,15 @@ MAX_CALORIES = 10000
 UNITS_PER_GRAM = 10  # protein is searched in tenths of a gram
 
 
+def _is_number(value) -> bool:
+    """A real, finite number: not a bool (True would pass as 1), NaN, or infinity."""
+    return (
+        isinstance(value, int | float)
+        and not isinstance(value, bool)
+        and math.isfinite(value)
+    )
+
+
 def _units(protein_g: float, up: bool = False) -> int:
     """Protein in tenths of a gram, rounded down (or up), ignoring float noise like 16.700000001."""
     tenths = round(protein_g * UNITS_PER_GRAM, 6)
@@ -63,16 +73,10 @@ class Goal:
     def __post_init__(self):
         # The same limits the API enforces, so code that skips the API (the
         # eval) can't ask for an impossible or enormous search.
-        if not (
-            isinstance(self.protein_g, int | float)
-            and math.isfinite(self.protein_g)
-            and 0 < self.protein_g <= MAX_PROTEIN_G
-        ):
+        if not (_is_number(self.protein_g) and 0 < self.protein_g <= MAX_PROTEIN_G):
             raise ValueError(f"protein_g must be > 0 and <= {MAX_PROTEIN_G}")
         if not (
-            isinstance(self.max_calories, int | float)
-            and math.isfinite(self.max_calories)
-            and 0 < self.max_calories <= MAX_CALORIES
+            _is_number(self.max_calories) and 0 < self.max_calories <= MAX_CALORIES
         ):
             raise ValueError(f"max_calories must be > 0 and <= {MAX_CALORIES}")
         if (
@@ -124,10 +128,16 @@ def dish_key(item) -> tuple[str, str]:
 
 
 def _usable_numbers(item) -> bool:
-    # check() already demands both numbers exist; this also rules out a NaN or
-    # infinite value, which would slip past its comparisons.
+    # check() already demands both numbers exist. This also rules out what its
+    # comparisons let through: NaN, infinity, and negative calories (with
+    # max_calories=inf, -300 kcal "fits", and would make a plan look lighter).
     label = item.nutrition
-    return math.isfinite(label.protein_g) and math.isfinite(label.calories)
+    return (
+        _is_number(label.protein_g)
+        and _is_number(label.calories)
+        and label.protein_g >= 0
+        and label.calories >= 0
+    )
 
 
 def candidates(items, goal: Goal) -> list:
