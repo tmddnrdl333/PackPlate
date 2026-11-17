@@ -16,7 +16,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 
-from app.api import crowd, filters, locations, meta
+from app.api import crowd, filters, locations, meta, planner
 from app.deps import get_engine
 from db.migrate import check_current
 
@@ -33,6 +33,7 @@ app.include_router(locations.router)
 app.include_router(meta.router)
 app.include_router(filters.router)
 app.include_router(crowd.router)
+app.include_router(planner.router)  # Project 3, M2
 
 
 @app.get("/health")

@@ -13,6 +13,7 @@ import type {
   Menu,
   Profile,
 } from "./types";
+import type { LocationPlan, PlanRequest } from "./planner";
 
 export const API_URL =
   process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
@@ -107,6 +108,10 @@ export const api = {
 
   reportCrowd: (id: number, level: CrowdLevel) =>
     request<Crowd>(`/crowd/${id}`, { level }),
+
+  // Project 3, M2: a one-location daily meal plan at every location, best first.
+  planDay: (body: PlanRequest, date?: string) =>
+    request<LocationPlan[]>(`/planner/day${query({ date })}`, body),
 };
 
 export function errorMessage(error: unknown): string {

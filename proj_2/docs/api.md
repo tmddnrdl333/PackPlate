@@ -13,6 +13,7 @@ Every endpoint and data model of the PackPlate API, read from the API's own Open
 - [`POST /filters/locations/{location_id}/menus`](#post-filterslocationslocation_idmenus)
 - [`POST /filters/group`](#post-filtersgroup)
 - [`POST /crowd/{location_id}`](#post-crowdlocation_id)
+- [`POST /planner/day`](#post-plannerday)
 - [`GET /health`](#get-health)
 
 ### `GET /locations`
@@ -117,6 +118,27 @@ One report per location per client every CROWD_REPORT_COOLDOWN_SECONDS (429 othe
 | Response | Body |
 |---|---|
 | 201 Successful Response | [Crowd](#crowd) |
+| 422 Validation Error | [HTTPValidationError](#httpvalidationerror) |
+
+### `POST /planner/day`
+
+A one-location meal plan for `date` (default today) at every location, best first.
+
+Ranked: plans that meet the goal (fewest calories first), then plans that
+fall short (most protein first), then locations with nothing to plan.
+With `location_id`, only that location (404 if it doesn't exist; a known
+location with no menu that day gets a "none" plan).
+
+| Parameter | In | Type | Required | Default |
+|---|---|---|---|---|
+| `date` | query | string (date) or null | no |  |
+| `location_id` | query | integer or null | no |  |
+
+**Request body:** [PlanRequest](#planrequest)
+
+| Response | Body |
+|---|---|
+| 200 Successful Response | list of [LocationPlan](#locationplan) |
 | 422 Validation Error | [HTTPValidationError](#httpvalidationerror) |
 
 ### `GET /health`
@@ -258,6 +280,22 @@ A location's summary plus 7 days of hours (from today) and its menus from today 
 | `hours` | list of [HoursDay](#hoursday) | yes |
 | `menus` | list of [MenuSummary](#menusummary) | yes |
 
+### LocationPlan
+
+The planner's answer for one location on one day.
+
+| Field | Type | Required |
+|---|---|---|
+| `location_id` | integer | yes |
+| `location_name` | string | yes |
+| `date` | string (date) | yes |
+| `status` | `met` / `short` / `none` | yes |
+| `items` | list of [PlannedItem](#planneditem) | yes |
+| `protein_g` | number | yes |
+| `calories` | number | yes |
+| `candidates` | integer | yes |
+| `items_checked` | integer | yes |
+
 ### LocationSummary
 
 A location with today's hours, whether it's open, and its crowd level.
@@ -340,6 +378,37 @@ One opening period, from opens_at to closes_at (campus time).
 |---|---|---|
 | `opens_at` | string (date-time) | yes |
 | `closes_at` | string (date-time) | yes |
+
+### PlanRequest
+
+One student's day: allergens and diets (as in a filter profile) plus daily goals.
+
+| Field | Type | Required |
+|---|---|---|
+| `avoid` | list of `dairy` / `egg` / `gluten` / `nuts` / `pork` / `seafood` / `sesame` / `soy` | no |
+| `diets` | list of `halal` / `vegan` / `vegetarian` | no |
+| `protein_goal_g` | number | yes |
+| `max_calories` | number | yes |
+| `max_items` | integer | no |
+| `meals` | list of string or null | no |
+
+### PlannedItem
+
+A dish in a plan: the menu item, plus which meal it is served at.
+
+| Field | Type | Required |
+|---|---|---|
+| `id` | integer | yes |
+| `name` | string | yes |
+| `course` | string or null | yes |
+| `serving_size` | string or null | yes |
+| `allergens` | list of string | yes |
+| `diets` | list of string | yes |
+| `diets_removed` | object | no |
+| `nutrition_unavailable` | boolean | no |
+| `unrecognized_traits` | list of string | yes |
+| `nutrition` | [Nutrition](#nutrition) or null | yes |
+| `meal` | string | yes |
 
 ### Profile
 
