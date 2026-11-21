@@ -31,6 +31,8 @@ class HoursDay(BaseModel):
 
 
 class Coordinates(BaseModel):
+    """Approximate dining location coordinates in decimal degrees."""
+
     latitude: float
     longitude: float
 

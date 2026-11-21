@@ -9,6 +9,7 @@ from db.models import HoursDay, Location, LocationCoordinate, Menu, MenuItem
 
 
 def coordinates_by_location(db: Session) -> dict[int, LocationCoordinate]:
+    """Curated dining coordinates keyed by NetNutrition unit ID."""
     return {row.location_id: row for row in db.scalars(select(LocationCoordinate))}
 
 

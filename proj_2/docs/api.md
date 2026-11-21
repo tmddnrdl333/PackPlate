@@ -154,6 +154,15 @@ when the database is unreachable.
 
 ## Data models
 
+### Coordinates
+
+Approximate dining location coordinates in decimal degrees.
+
+| Field | Type | Required |
+|---|---|---|
+| `latitude` | number | yes |
+| `longitude` | number | yes |
+
 ### Crowd
 
 A location's current crowd level, worked out from recent student reports.
@@ -277,6 +286,7 @@ A location's summary plus 7 days of hours (from today) and its menus from today 
 | `opens_next_at` | string (date-time) or null | yes |
 | `today` | [HoursDay](#hoursday) | yes |
 | `crowd` | [Crowd](#crowd) | yes |
+| `coordinates` | [Coordinates](#coordinates) or null | no |
 | `hours` | list of [HoursDay](#hoursday) | yes |
 | `menus` | list of [MenuSummary](#menusummary) | yes |
 
@@ -311,6 +321,7 @@ A location with today's hours, whether it's open, and its crowd level.
 | `opens_next_at` | string (date-time) or null | yes |
 | `today` | [HoursDay](#hoursday) | yes |
 | `crowd` | [Crowd](#crowd) | yes |
+| `coordinates` | [Coordinates](#coordinates) or null | no |
 
 ### Menu
 
