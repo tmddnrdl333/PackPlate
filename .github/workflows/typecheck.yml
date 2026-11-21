@@ -36,3 +36,6 @@ jobs:
       # Generates Next's route types first, which a fresh checkout lacks.
       - name: Check
         run: npm run typecheck
+
+      - name: Run frontend unit tests
+        run: npm test

@@ -51,6 +51,22 @@ class Location(Base):
     menus: Mapped[list["Menu"]] = relationship(back_populates="location")
 
 
+class LocationCoordinate(Base):
+    """Curated coordinates keyed by NetNutrition unit, seeded before ingestion."""
+
+    __tablename__ = "location_coordinates"
+    __table_args__ = (
+        CheckConstraint("latitude BETWEEN -90 AND 90", name="ck_latitude"),
+        CheckConstraint("longitude BETWEEN -180 AND 180", name="ck_longitude"),
+    )
+
+    location_id: Mapped[int] = mapped_column(
+        Integer, primary_key=True, autoincrement=False
+    )
+    latitude: Mapped[float] = mapped_column(Float)
+    longitude: Mapped[float] = mapped_column(Float)
+
+
 class HoursDay(Base):
     """Hours for one location on one date, from dining.ncsu.edu. Writer: ingestion.
 

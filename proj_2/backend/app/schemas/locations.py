@@ -30,6 +30,11 @@ class HoursDay(BaseModel):
     raw_text: str | None  # as shown on dining.ncsu.edu
 
 
+class Coordinates(BaseModel):
+    latitude: float
+    longitude: float
+
+
 class LocationSummary(BaseModel):
     """A location with today's hours, whether it's open, and its crowd level."""
 
@@ -42,6 +47,7 @@ class LocationSummary(BaseModel):
     opens_next_at: datetime | None  # next opening later today
     today: HoursDay
     crowd: Crowd  # from recent student reports (services/crowd.py)
+    coordinates: Coordinates | None = None
 
 
 class MenuSummary(BaseModel):

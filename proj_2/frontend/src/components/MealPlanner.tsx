@@ -5,6 +5,7 @@
 import Link from "next/link";
 import { useRef, useState, type FormEvent } from "react";
 import { api, errorMessage } from "@/lib/api";
+import { sortByDistance, walkingEstimate } from "@/lib/campusDistance";
 import { ALLERGENS, DIETS } from "@/lib/diet";
 import { formatNumber } from "@/lib/format";
 import {
@@ -19,6 +20,7 @@ import { useHydrated, useSavedProfile } from "@/lib/profileStore";
 import { stationLabel } from "@/lib/stations";
 import type { Allergen, Diet, Profile } from "@/lib/types";
 import { VerdictBadge } from "./Badges";
+import { DistanceSort, useDistanceSort } from "./DistanceSort";
 import { StateMessage } from "./StateMessage";
 
 type Search =
@@ -33,7 +35,15 @@ function toggle<T>(list: T[], key: T): T[] {
   return list.includes(key) ? list.filter((k) => k !== key) : [...list, key];
 }
 
-function PlanCard({ plan, goal }: { plan: LocationPlan; goal: number }) {
+function PlanCard({
+  plan,
+  goal,
+  meters,
+}: {
+  plan: LocationPlan;
+  goal: number;
+  meters: number | undefined;
+}) {
   const met = plan.status === "met";
   return (
     <li
@@ -51,6 +61,9 @@ function PlanCard({ plan, goal }: { plan: LocationPlan; goal: number }) {
         {plan.items.length === 1 ? "" : "es"} · chosen from {plan.candidates}{" "}
         that fit you
       </p>
+      {meters !== undefined ? (
+        <p className="meta">{walkingEstimate(meters)}</p>
+      ) : null}
       {/* The shared table style is sized for one label; a plan needs the full width. */}
       <table className="nutrition-table" style={{ maxWidth: "none" }}>
         <caption className="visually-hidden">
@@ -106,6 +119,7 @@ function PlannerForm({ saved }: { saved: Profile }) {
   const [date, setDate] = useState<string>("");
   const [problem, setProblem] = useState<string | null>(null);
   const [search, setSearch] = useState<Search>({ status: "idle" });
+  const distance = useDistanceSort();
   // Bumped on every edit and every submit. A plan is only shown if nothing
   // changed since it was asked for, so it can never be read as the plan for
   // allergies or goals the student has since changed.
@@ -146,7 +160,11 @@ function PlannerForm({ saved }: { saved: Profile }) {
   const done = search.status === "done" ? search : null;
   const met = done?.plans.filter((p) => p.status === "met") ?? [];
   const short = done?.plans.filter((p) => p.status === "short") ?? [];
-  const best = met.length > 0 ? met : short;
+  const best = sortByDistance(
+    met.length > 0 ? met : short,
+    (plan) => plan.location_id,
+    distance.distances,
+  );
   const noMenus =
     done !== null && done.plans.every((p) => p.items_checked === 0);
   const someFit = done?.plans.some((p) => p.candidates > 0) ?? false;
@@ -304,9 +322,10 @@ function PlannerForm({ saved }: { saved: Profile }) {
               <h2 className="section-title">
                 {met.length > 0
                   ? "Plans that reach your goal"
-                  : "No location reaches your goal; the closest"}{" "}
+                  : "Plans that fall short of your goal"}{" "}
                 <span className="count">({best.length})</span>
               </h2>
+              <DistanceSort controls={distance} />
               {met.length === 0 ? (
                 <p className="banner banner-warn">
                   Try a lower protein goal, a higher calorie limit, or more
@@ -319,6 +338,7 @@ function PlannerForm({ saved }: { saved: Profile }) {
                     key={plan.location_id}
                     plan={plan}
                     goal={done.goal}
+                    meters={distance.distances.get(plan.location_id)}
                   />
                 ))}
               </ul>
@@ -327,10 +347,14 @@ function PlannerForm({ saved }: { saved: Profile }) {
                   Also:{" "}
                   {best
                     .slice(SHOWN)
-                    .map(
-                      (p) =>
-                        `${p.location_name} (${formatNumber(p.protein_g, " g")}, ${formatNumber(p.calories, " cal")})`,
-                    )
+                    .map((p) => {
+                      const meters = distance.distances.get(p.location_id);
+                      const walk =
+                        meters === undefined
+                          ? ""
+                          : `, ${walkingEstimate(meters)}`;
+                      return `${p.location_name} (${formatNumber(p.protein_g, " g")}, ${formatNumber(p.calories, " cal")}${walk})`;
+                    })
                     .join(" · ")}
                 </p>
               ) : null}

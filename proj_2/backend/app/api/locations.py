@@ -26,6 +26,7 @@ from app.services.crowd import WINDOW, aggregate
 from app.services.hours import campus_time, open_state, periods
 from app.services.label_reviews import reviewed_items
 from app.services.menus import menu_sort_key
+from db.models import LocationCoordinate
 
 DINING_LOCATION_URL = "https://dining.ncsu.edu/location/{slug}/"
 DAYS_SHOWN = 7
@@ -46,7 +47,13 @@ def _hours_day(day: date, row) -> HoursDay:
     )
 
 
-def _summary(location, hours: dict, reports: dict, at: datetime) -> dict:
+def _summary(
+    location,
+    hours: dict,
+    reports: dict,
+    at: datetime,
+    coordinates: LocationCoordinate | None,
+) -> dict:
     today = at.date()
     todays = hours.get((location.id, today))
     state = open_state(at, todays, hours.get((location.id, today - timedelta(days=1))))
@@ -64,6 +71,7 @@ def _summary(location, hours: dict, reports: dict, at: datetime) -> dict:
         "opens_next_at": state.opens_next_at,
         "today": _hours_day(today, todays),
         "crowd": vars(aggregate(reports.get(location.id, []), at)),
+        "coordinates": coordinates,
     }
 
 
@@ -89,8 +97,10 @@ def list_locations(at: datetime | None = None, db: Session = Depends(get_db)):
     at = campus_time(at)
     hours = locations_repo.hours_between(db, at.date() - timedelta(days=1), at.date())
     reports = crowd_repo.reports_between(db, at - WINDOW, at)
+    coordinates = locations_repo.coordinates_by_location(db)
     return [
-        _summary(loc, hours, reports, at) for loc in locations_repo.list_locations(db)
+        _summary(loc, hours, reports, at, coordinates.get(loc.id))
+        for loc in locations_repo.list_locations(db)
     ]
 
 
@@ -107,8 +117,9 @@ def get_location(
     )
     menus = sorted(menus_repo.menus_from(db, location_id, days[0]), key=menu_sort_key)
     reports = crowd_repo.reports_between(db, at - WINDOW, at, location_id)
+    coordinates = db.get(LocationCoordinate, location_id)
     return {
-        **_summary(location, hours, reports, at),
+        **_summary(location, hours, reports, at, coordinates),
         "hours": [_hours_day(day, hours.get((location_id, day))) for day in days],
         "menus": [_menu_summary(m) for m in menus],
     }
