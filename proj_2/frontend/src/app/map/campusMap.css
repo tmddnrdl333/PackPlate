@@ -1,0 +1,20 @@
+.campus-map {
+  height: clamp(20rem, 55vh, 32rem);
+  border-radius: 0.75rem;
+  isolation: isolate;
+}
+
+.campus-map .campus-pin {
+  border: 2px solid white;
+  border-radius: 50%;
+  background: #795514;
+  box-shadow: 0 1px 5px #0008;
+}
+
+.campus-map .campus-pin-open {
+  background: #136b46;
+}
+
+.campus-map .campus-pin-closed {
+  background: #b22222;
+}

@@ -86,6 +86,7 @@ From `proj_2/frontend/package.json`.
 | next | 16.3.8 | The website framework | MIT |
 | react | 19.2.8 | UI library | MIT |
 | react-dom | 19.2.8 | UI library (browser) | MIT |
+| leaflet | 1.9.4 | Interactive campus map | BSD-2-Clause |
 | typescript | 5.9.3 | Type checking (dev only) | Apache-2.0 |
 | eslint | 9.39.5 | Linter (dev only) | MIT |
 | eslint-config-next | 16.3.8 | Next.js lint rules (dev only) | MIT |
@@ -94,19 +95,20 @@ From `proj_2/frontend/package.json`.
 | @types/node | 20.19.43 | Type definitions (dev only) | MIT |
 | @types/react | 19.3.0 | Type definitions (dev only) | MIT |
 | @types/react-dom | 19.3.0 | Type definitions (dev only) | MIT |
+| @types/leaflet | 1.9.22 | Leaflet type definitions (dev only) | MIT |
 
 ## Website (npm): everything installed
 
-The lockfile lists **405 packages** in total, all installed by the 11 above.
+The lockfile lists **408 packages** in total, including the 13 above.
 By license:
 
 | License | Packages |
 |---|---|
-| MIT | 326 |
+| MIT | 328 |
 | Apache-2.0 | 34 |
 | ISC | 16 |
 | LGPL-3.0-or-later | 10 |
-| BSD-2-Clause | 7 |
+| BSD-2-Clause | 8 |
 | Apache-2.0 AND LGPL-3.0-or-later | 3 |
 | BSD-3-Clause | 2 |
 | Apache-2.0 AND LGPL-3.0-or-later AND MIT | 1 |
@@ -151,3 +153,5 @@ Menus, nutrition labels, and hours come from NC State's NetNutrition
 software library; NC State Dining gave the team permission to scrape them at
 most once or twice a day. A trimmed copy for the M0 eval is committed in
 `proj_2/eval/data/snapshot.json`.
+
+The campus map uses [OpenStreetMap tiles and data](https://www.openstreetmap.org/copyright).

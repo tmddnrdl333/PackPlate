@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState, type FormEvent } from "react";
 import { api, errorMessage } from "@/lib/api";
+import { sortByDistance, walkingEstimate } from "@/lib/campusDistance";
 import {
   emptyProfile,
   hasConstraints,
@@ -14,6 +15,7 @@ import { formatTime } from "@/lib/format";
 import { useHydrated, useSavedProfile } from "@/lib/profileStore";
 import type { GroupLocation, Profile } from "@/lib/types";
 import { StatusPill } from "./Badges";
+import { DistanceSort, useDistanceSort } from "./DistanceSort";
 import { ProfileFields } from "./ProfileFields";
 import { StateMessage } from "./StateMessage";
 
@@ -35,9 +37,11 @@ function labelFor(profile: Profile, index: number): string {
 function ResultCard({
   location,
   labels,
+  meters,
 }: {
   location: GroupLocation;
   labels: string[];
+  meters: number | undefined;
 }) {
   const when =
     location.is_open === true && location.closes_at
@@ -57,6 +61,9 @@ function ResultCard({
         <StatusPill isOpen={location.is_open} />
       </div>
       {when ? <p className="meta">{when}</p> : null}
+      {meters !== undefined ? (
+        <p className="meta">{walkingEstimate(meters)}</p>
+      ) : null}
 
       {location.items_checked === 0 ? (
         <p className="banner banner-warn">
@@ -92,6 +99,7 @@ function GroupForm({ initial }: { initial: Profile }) {
   const [nextId, setNextId] = useState(2);
   const [search, setSearch] = useState<Search>({ status: "idle" });
   const [problem, setProblem] = useState<string | null>(null);
+  const distance = useDistanceSort();
 
   function updateMember(id: number, profile: Profile) {
     setMembers((list) =>
@@ -136,14 +144,16 @@ function GroupForm({ initial }: { initial: Profile }) {
   }
 
   const nobodyRestricted = members.every((m) => !hasConstraints(m.profile));
-  const everyone =
+  const ordered =
     search.status === "done"
-      ? search.results.filter((r) => r.everyone_fits)
+      ? sortByDistance(
+          search.results,
+          (result) => result.id,
+          distance.distances,
+        )
       : [];
-  const others =
-    search.status === "done"
-      ? search.results.filter((r) => !r.everyone_fits)
-      : [];
+  const everyone = ordered.filter((r) => r.everyone_fits);
+  const others = ordered.filter((r) => !r.everyone_fits);
 
   return (
     <>
@@ -225,6 +235,7 @@ function GroupForm({ initial }: { initial: Profile }) {
             </StateMessage>
           ) : (
             <div className="page-body" style={{ marginTop: 0 }}>
+              <DistanceSort controls={distance} />
               <div>
                 <h2 className="section-title">
                   Everyone can eat here{" "}
@@ -242,6 +253,7 @@ function GroupForm({ initial }: { initial: Profile }) {
                         key={location.id}
                         location={location}
                         labels={search.labels}
+                        meters={distance.distances.get(location.id)}
                       />
                     ))}
                   </ul>
@@ -260,6 +272,7 @@ function GroupForm({ initial }: { initial: Profile }) {
                         key={location.id}
                         location={location}
                         labels={search.labels}
+                        meters={distance.distances.get(location.id)}
                       />
                     ))}
                   </ul>

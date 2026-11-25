@@ -5,7 +5,12 @@ from datetime import date
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from db.models import HoursDay, Location, Menu, MenuItem
+from db.models import HoursDay, Location, LocationCoordinate, Menu, MenuItem
+
+
+def coordinates_by_location(db: Session) -> dict[int, LocationCoordinate]:
+    """Curated dining coordinates keyed by NetNutrition unit ID."""
+    return {row.location_id: row for row in db.scalars(select(LocationCoordinate))}
 
 
 def list_locations(db: Session) -> list[Location]:

@@ -4,7 +4,7 @@
 
 Every public module, class, and function in the Python code, with its signature and description, read from the source. The website (`frontend/`) is described in [how.md](how.md) instead.
 
-**273 of 273** modules, classes, and functions have a description.
+**276 of 276** modules, classes, and functions have a description.
 
 - **API** (`backend/app/`)
   - [`app`](#app)
@@ -341,6 +341,14 @@ Source: [`backend/app/repositories/locations.py`](../backend/app/repositories/lo
 
 Queries for locations and their hours. Read-only: ingestion writes these tables.
 
+### `coordinates_by_location`
+
+```python
+def coordinates_by_location(db: Session) -> dict[int, LocationCoordinate]
+```
+
+Curated dining coordinates keyed by NetNutrition unit ID.
+
 ### `list_locations`
 
 ```python
@@ -542,6 +550,15 @@ Fields:
 - `periods: list[Period]`
 - `raw_text: str | None`
 
+### class `Coordinates` (BaseModel)
+
+Approximate dining location coordinates in decimal degrees.
+
+Fields:
+
+- `latitude: float`
+- `longitude: float`
+
 ### class `LocationSummary` (BaseModel)
 
 A location with today's hours, whether it's open, and its crowd level.
@@ -557,6 +574,7 @@ Fields:
 - `opens_next_at: datetime | None`
 - `today: HoursDay`
 - `crowd: Crowd`
+- `coordinates: Coordinates | None`
 
 ### class `MenuSummary` (BaseModel)
 
@@ -1164,6 +1182,16 @@ Fields:
 - `dining_slug: Mapped[str | None]`
 - `updated_at: Mapped[datetime]`
 - `menus: Mapped[list['Menu']]`
+
+### class `LocationCoordinate` (Base)
+
+Curated coordinates keyed by NetNutrition unit, seeded before ingestion.
+
+Fields:
+
+- `location_id: Mapped[int]`
+- `latitude: Mapped[float]`
+- `longitude: Mapped[float]`
 
 ### class `HoursDay` (Base)
 

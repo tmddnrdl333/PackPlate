@@ -6,6 +6,8 @@
 // running on :8000) and import from src/lib/api-schema.d.ts instead. Until
 // then, if a backend schema changes, change it here too.
 
+import type { Coordinates } from "./campusDistance";
+
 export type CrowdLevel = "not_busy" | "moderate" | "crowded";
 export type Allergen =
   "dairy" | "egg" | "gluten" | "nuts" | "pork" | "seafood" | "sesame" | "soy";
@@ -41,6 +43,7 @@ export interface HoursDay {
 }
 
 export interface LocationSummary {
+  coordinates?: Coordinates | null;
   id: number;
   name: string;
   description: string | null;
