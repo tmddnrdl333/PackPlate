@@ -185,6 +185,10 @@ My diet, not saved back), protein goal, calorie limit, most dishes, and an
 optional day. Shows the top 3 plans in full — each dish with its meal,
 station, protein, calories, and a ✓ Fits badge — and lists the rest by name.
 If no location meets the goal, it shows the closest plans and says so.
+Since P3 M0 ([p3-m0-planner-eval.md](p3-m0-planner-eval.md)), it then also
+says how much protein the best location *can* reach. Vegetarian and vegan
+students get a note that plant-based options are limited, and a button sets
+the goal to that amount (`goalWarning` in `frontend/src/lib/planner.ts`).
 
 ## Tests
 

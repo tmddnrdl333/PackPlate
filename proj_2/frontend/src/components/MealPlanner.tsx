@@ -11,6 +11,7 @@ import { formatNumber } from "@/lib/format";
 import {
   PLAN_DEFAULTS,
   PLAN_LIMITS,
+  goalWarning,
   progress,
   validatePlan,
   type LocationPlan,
@@ -165,6 +166,7 @@ function PlannerForm({ saved }: { saved: Profile }) {
     (plan) => plan.location_id,
     distance.distances,
   );
+  const warning = done ? goalWarning(done.plans, done.goal, diets) : null;
   const noMenus =
     done !== null && done.plans.every((p) => p.items_checked === 0);
   const someFit = done?.plans.some((p) => p.candidates > 0) ?? false;
@@ -326,11 +328,39 @@ function PlannerForm({ saved }: { saved: Profile }) {
                 <span className="count">({best.length})</span>
               </h2>
               <DistanceSort controls={distance} />
-              {met.length === 0 ? (
-                <p className="banner banner-warn">
-                  Try a lower protein goal, a higher calorie limit, or more
-                  dishes.
-                </p>
+              {warning ? (
+                <div className="banner banner-warn" role="status">
+                  <p style={{ margin: 0 }}>
+                    <strong>
+                      No dining location can reach{" "}
+                      {formatNumber(warning.goal, " g")} of protein for you on
+                      this day.
+                    </strong>{" "}
+                    The most any one location offers within your limits is{" "}
+                    {formatNumber(warning.reachable, " g")} ({warning.location}
+                    ).
+                    {warning.plantBased
+                      ? " Campus menus have few high-protein vegetarian and vegan dishes, so high goals are often out of reach at one location."
+                      : ""}
+                  </p>
+                  {warning.suggested > 0 ? (
+                    <div className="button-row" style={{ marginTop: 8 }}>
+                      <button
+                        type="button"
+                        className="btn"
+                        onClick={() => {
+                          setProtein(String(warning.suggested));
+                          edited();
+                        }}
+                      >
+                        Use a {warning.suggested} g goal
+                      </button>
+                    </div>
+                  ) : null}
+                  <p className="help" style={{ marginBottom: 0 }}>
+                    Or try a higher calorie limit or more dishes.
+                  </p>
+                </div>
               ) : null}
               <ul className="stack">
                 {best.slice(0, SHOWN).map((plan) => (

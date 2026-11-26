@@ -79,6 +79,14 @@ jobs:
           --junitxml="$GITHUB_WORKSPACE/test-results/eval_loop2.xml"
           --cov-report=xml:"$GITHUB_WORKSPACE/coverage/eval_loop2.xml"
 
+      - name: P3 M0 planner eval tests
+        if: ${{ !cancelled() }}
+        working-directory: proj_2
+        run: >-
+          pytest eval_planner --cov=eval_planner --cov-config=pyproject.toml
+          --junitxml="$GITHUB_WORKSPACE/test-results/eval_planner.xml"
+          --cov-report=xml:"$GITHUB_WORKSPACE/coverage/eval_planner.xml"
+
       # docs/reference.md and docs/api.md are generated from the code.
       - name: Generated docs are up to date
         if: ${{ !cancelled() }}
@@ -92,7 +100,7 @@ jobs:
         uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
-          files: coverage/backend.xml,coverage/ingestion.xml,coverage/eval.xml,coverage/eval_loop2.xml
+          files: coverage/backend.xml,coverage/ingestion.xml,coverage/eval.xml,coverage/eval_loop2.xml,coverage/eval_planner.xml
           disable_search: true
           fail_ci_if_error: false
 
@@ -106,7 +114,7 @@ jobs:
         run: >-
           python .github/scripts/test_badge.py
           test-results/backend.xml test-results/ingestion.xml test-results/eval.xml
-          test-results/eval_loop2.xml
+          test-results/eval_loop2.xml test-results/eval_planner.xml
           | tee -a "$GITHUB_OUTPUT"
 
       - name: Update test badge

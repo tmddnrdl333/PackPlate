@@ -4,7 +4,7 @@
 
 Every public module, class, and function in the Python code, with its signature and description, read from the source. The website (`frontend/`) is described in [how.md](how.md) instead.
 
-**276 of 276** modules, classes, and functions have a description.
+**304 of 304** modules, classes, and functions have a description.
 
 - **API** (`backend/app/`)
   - [`app`](#app)
@@ -74,6 +74,12 @@ Every public module, class, and function in the Python code, with its signature 
   - [`eval_loop2.sample`](#eval_loop2sample)
   - [`eval_loop2.simulate`](#eval_loop2simulate)
   - [`eval_loop2.snapshot`](#eval_loop2snapshot)
+- **P3 M0 planner eval** (`eval_planner/`)
+  - [`eval_planner`](#eval_planner)
+  - [`eval_planner.m0`](#eval_plannerm0)
+  - [`eval_planner.sample`](#eval_plannersample)
+  - [`eval_planner.snapshot`](#eval_plannersnapshot)
+  - [`eval_planner.students`](#eval_plannerstudents)
 
 # API: `backend/app/`
 
@@ -2881,3 +2887,287 @@ def verdict(item: dict, location_id: int, snapshot: dict, approved: dict, profil
 ```
 
 Today's PackPlate verdict for one snapshot item and one profile.
+
+# P3 M0 planner eval: `eval_planner/`
+
+## `eval_planner`
+
+Source: [`eval_planner/__init__.py`](../eval_planner/__init__.py)
+
+Project 3 M0: does the daily meal planner (P3 M2) work for restricted students?
+
+Plan: docs/p3-m0-planner-eval.md. It calls the planner the API uses
+(backend/app/services/planner.py), so backend/ goes on the import path, as in
+the original team's eval/ and eval_loop2/. It reuses eval_loop2's snapshot
+reader and person simulator rather than copying them, so both evals turn
+snapshot rows into dishes and draw restrictions the same way.
+
+## `eval_planner.m0`
+
+Source: [`eval_planner/m0.py`](../eval_planner/m0.py)
+
+```text
+Project 3 M0: does the daily meal planner work for students with restrictions?
+
+One command, from proj_2/:
+
+    python -m eval_planner.m0            # compute, print, write eval_planner/results.json
+    python -m eval_planner.m0 --check    # recompute; fail if it differs from results.json
+
+Plan and targets: docs/p3-m0-planner-eval.md. In short, for simulated students
+with at least one restriction, on six frozen campus days:
+
+Useful   on >= 90% of student-days, some location's plan from
+         app.services.planner.plan() (the function the API uses) is `met`
+         (protein >= goal, calories <= limit) AND every planned dish has a
+         plausible label (see settings.json). A plan built on a whole-pan label
+         isn't one a student can eat, so it doesn't count.
+Safe     (a) automatic: 0 planned dishes that filter_engine.check() doesn't call
+         `fits` for that student's full profile; (b) by hand: 0 missed in 50
+         random planned (dish, student) pairs whose ingredients a person read.
+Baseline the single best dish (what PackPlate offered before the planner): some
+         safe, plausible dish alone reaches the goal under the limit.
+Warning  (descope decision, after the first result) of the missed student-days,
+         how many get the planner page's "no location can reach your goal"
+         warning: no location's plan is `met` and at least one is `short`.
+
+A missed target is reported, not an error. Only a crash, a stale hand-check
+sheet, or (with --check) a changed result fails.
+```
+
+### class `StaleSheet` (Exception)
+
+The hand-check sheet doesn't match what the snapshots and the draw produce.
+
+### `plausible`
+
+```python
+def plausible(item, rules: dict) -> bool
+```
+
+Could one serving really have this label? (See settings.json.)
+
+### `student_day`
+
+```python
+def student_day(student: Student, locations: dict, rules: dict) -> dict
+```
+
+One student on one day: every location's plan, scored.
+
+### `rate`
+
+```python
+def rate(hits: int, total: int) -> float
+```
+
+hits / total, rounded to 4 places (0 when there's nothing to count).
+
+### `band`
+
+```python
+def band(goal_g: float) -> str
+```
+
+The goal band a protein goal falls in, e.g. "91-120 g".
+
+### `run`
+
+```python
+def run(settings: dict, days: dict, raw: dict)
+```
+
+Score every student-day. Returns the Useful numbers and the hand-check pool.
+
+### `draw`
+
+```python
+def draw(pairs: list[dict], settings: dict, names: dict) -> list[dict]
+```
+
+The fixed random sample for the hand check, numbered from 1.
+
+### `read_sheet`
+
+```python
+def read_sheet(path: Path=SHEET) -> list[dict]
+```
+
+The sheet, decisions lowercased. A blank decision means not checked yet.
+
+### `check_sheet`
+
+```python
+def check_sheet(filled: list[dict], expected: list[dict])
+```
+
+The sheet must hold exactly the pairs the fixed draw gives, in order.
+
+### `hand_check`
+
+```python
+def hand_check(rows: list[dict], pool_size: int, left_out: int) -> dict
+```
+
+The Safe numbers from the hand check (blank decisions count as not checked).
+
+### `evaluate`
+
+```python
+def evaluate() -> dict
+```
+
+Run the whole eval on the committed inputs and return the result.
+
+### `show`
+
+```python
+def show(result: dict) -> str
+```
+
+The result as the table printed on the terminal.
+
+### `main`
+
+```python
+def main(argv=None) -> int
+```
+
+Run the eval; with --check, compare with results.json instead of writing it.
+
+## `eval_planner.sample`
+
+Source: [`eval_planner/sample.py`](../eval_planner/sample.py)
+
+```text
+Write the hand-check sheet: 50 random (dish, student) pairs from planned meals.
+
+Run once, from proj_2/:
+
+    python -m eval_planner.sample
+
+It writes eval_planner/data/sample.csv and refuses to overwrite it once it
+exists. A person fills in `decision` for each row after reading the dish's full
+ingredient list against the student's restrictions, without looking at
+PackPlate's icons or flags: "ok", "missed" (the ingredients name something
+the student must avoid), or "unclear" (the label can't tell).
+```
+
+### `main`
+
+```python
+def main() -> int
+```
+
+Draw the sheet once; never overwrite one that may hold decisions.
+
+## `eval_planner.snapshot`
+
+Source: [`eval_planner/snapshot.py`](../eval_planner/snapshot.py)
+
+The six frozen campus days the planner eval runs on, as today's API sees them.
+
+Both of the original team's snapshots are used: Oct 12-14 (eval/data) and
+Oct 20-22 (eval_loop2/data). They are read, never changed.
+
+The Oct 12-14 snapshot was exported before PackPlate scanned ingredient lists,
+so its labels have no `ingredient_flags`. Production computes that field as
+`ingestion.ingredients.matched_terms(ingredients)` (ingestion/normalize.py), so
+the same call here gives exactly what the live filter would read. It also has
+no `missing_fields`, `serving_size`, or approved label reviews; those are left
+empty (NC State's incomplete-nutrient flags are unknown for those three days).
+
+### `upgrade`
+
+```python
+def upgrade(snapshot: dict) -> dict
+```
+
+A copy with every field today's filter reads, filling what an old export lacks.
+
+### `load`
+
+```python
+def load(paths=SNAPSHOTS) -> list[dict]
+```
+
+Every snapshot, upgraded.
+
+### `campus_days`
+
+```python
+def campus_days(snapshots: list[dict]) -> tuple[dict, dict, dict]
+```
+
+```text
+Every campus day, as (days, names, raw).
+
+days:  {date: {location_id: [items as the API hands them to the planner]}};
+       all of a location's menus that day are pooled, as the API does
+       without `meals`.
+names: {location_id: location name}.
+raw:   {(date, location_id, item id): {"ingredients", "label_key"}}, for
+       the hand-check sheet.
+```
+
+## `eval_planner.students`
+
+Source: [`eval_planner/students.py`](../eval_planner/students.py)
+
+Simulated students for the planner eval. Simulated users, not real ones.
+
+Restrictions come from the same published rates as PackPlate's own M0
+(eval_loop2/simulation.json, drawn by eval_loop2.simulate.person). The claim is
+about students *with* restrictions, so a student with none is redrawn. Each
+student also gets a daily protein goal and a calorie limit, kept for all days.
+A fixed seed gives the same students every run.
+
+### class `Student`
+
+One simulated student: their restrictions and their daily goal.
+
+Fields:
+
+- `profile: Profile`
+- `goal: Goal`
+
+#### `group`
+
+```python
+@property
+def group(self) -> str
+```
+
+vegan, vegetarian, or other (allergies, pork, or halal only).
+
+#### `describe`
+
+```python
+def describe(self) -> str
+```
+
+The restrictions in words, e.g. "avoids nuts, is vegan".
+
+### `load_settings`
+
+```python
+def load_settings(path: Path=SETTINGS) -> dict
+```
+
+The eval settings in eval_planner/settings.json.
+
+### `restricted_person`
+
+```python
+def restricted_person(rng: random.Random, rates: dict) -> Profile
+```
+
+One person drawn at the published rates, redrawn until they have a restriction.
+
+### `students`
+
+```python
+def students(settings: dict, rates: dict | None=None) -> list[Student]
+```
+
+All the simulated students. The same seed always gives the same students.

@@ -11,6 +11,7 @@
 [![Typecheck](https://github.com/morgansimon425/PackPlate/actions/workflows/typecheck.yml/badge.svg?branch=dev)](https://github.com/morgansimon425/PackPlate/actions/workflows/typecheck.yml?query=branch%3Adev)
 [![M0 loop 1](https://github.com/morgansimon425/PackPlate/actions/workflows/m0.yml/badge.svg?branch=dev)](https://github.com/morgansimon425/PackPlate/actions/workflows/m0.yml?query=branch%3Adev)
 [![M0 loop 2](https://github.com/morgansimon425/PackPlate/actions/workflows/m0_loop2.yml/badge.svg?branch=dev)](https://github.com/morgansimon425/PackPlate/actions/workflows/m0_loop2.yml?query=branch%3Adev)
+[![P3 M0 planner](https://github.com/tmddnrdl333/PackPlate/actions/workflows/m0_planner.yml/badge.svg?branch=main)](https://github.com/tmddnrdl333/PackPlate/actions/workflows/m0_planner.yml?query=branch%3Amain)
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.23521650.svg)](https://doi.org/10.5281/zenodo.23521650)
 
 https://github.com/user-attachments/assets/c9b771b0-a093-43f9-bab0-dbc98d99fb92
@@ -23,7 +24,66 @@ constraints for several people at once, so a group with different diets can
 find a location where everyone has something to eat. Students can also report
 how busy each location is.
 
-## 🎯 M0: risk-killer eval
+## 🎯 M0 evals
+
+### Project 3 M0: the meal planner
+
+Our Project 3 work added a daily meal planner
+([P3 M2](proj_2/docs/p3-m2-meal-planner.md)). It combines dishes at one
+location to reach a student's protein goal under their calorie limit. Its M0
+tests whether that still works once a student's restrictions remove dishes.
+
+**The claim:** for a student with dietary restrictions and a daily protein
+goal (60–150 g), the planner builds a plan from that day's campus menus that
+meets the goal, stays under their calorie limit, and uses only dishes PackPlate
+marks safe for them, on **at least 90% of student-days**.
+
+| Target | Result | |
+|---|---|---|
+| **Useful:** ≥ 90% of student-days met | **84.5%** of 1,200 | ❌ missed |
+| **Safe:** 0 planned dishes the filter doesn't call `fits` | **0** | ✅ met |
+| **Safe:** 0 missed when the ingredients of 50 random planned dishes are read | **0** missed (44 ok, 6 unclear) | ✅ met |
+| *Baseline: the single best dish (PackPlate before the planner)* | *2.7%* | |
+| *After the descope: missed days that show the new goal warning* | ***186 of 186*** | ✅ |
+
+- **Where it misses:** students with only allergies, halal, or pork
+  restrictions reach their goal on **95%** of days. Vegetarian and vegan
+  students reach it on only **56–57%**, because no single location's menu
+  offers them more than about 94–109 g of protein a day. On every missed day,
+  no location had any plan that met the goal, so this is a menu limit, not a
+  planner bug.
+- **Spiral review: descope, and warn.** The claim is narrowed to what the
+  planner controls: when a location can reach the goal, the planner finds a
+  safe plan that does. When none can, the planner page now says so, names the
+  most protein one location offers, and has a button to use that as the goal.
+  The warning is new Project 3 code, and it appears on all 186 missed days.
+- **Safe, hand check:** 0 misses in 44 decided rows means the true miss rate
+  is at most 6.6% (95% confidence), not that it's 0. It was read by Claude
+  (AI) with the original team's loop 2 rules, and is **pending a team
+  member's confirmation**.
+- **Students:** 200 simulated students, **not real ones**. Each has at least
+  one restriction, drawn at the same published rates as the loop 1 and loop 2
+  evals below. Each student keeps one goal and calorie limit for six days.
+- **Data:** both frozen snapshots already in the repo, Oct 12–14 and
+  Oct 20–22, 2026. The eval calls the same `planner.plan()` function the API
+  uses.
+- **Labels one serving can't have** (e.g. "Sliced Mushrooms" with 162 g
+  protein, from a whole-pan label) don't count toward a met plan.
+- **Reproduce:** `cd proj_2 && python -m eval_planner.m0`, in about 40 s. The
+  **P3 M0 planner** badge means the committed numbers reproduce, not that the
+  targets were met.
+- **Details:** [the plan, the result, the hand check, and the decision](proj_2/docs/p3-m0-planner-eval.md),
+  [the result file](proj_2/eval_planner/results.json).
+
+### Inherited from Project 2 (still runs)
+
+The original team's M0 is unchanged. Both loops still run on this fork and
+reproduce their committed numbers after our Project 3 changes (rechecked
+2026-11-26 with `--check`). **Loop 2 measures today's PackPlate and meets both
+of its targets.** Loop 1's missed Safe target is the historical result that led
+to the loop 2 fixes.
+
+#### Loop 1
 
 **The claim**, posted in [issue #11](https://github.com/morgansimon425/PackPlate/issues/11)
 before the first run: a group of friends with different diets can find
@@ -49,7 +109,7 @@ PackPlate ever telling someone a dish is safe when it isn't.
   [the result](proj_2/eval/results.json), and the review decision in
   [issue #11](https://github.com/morgansimon425/PackPlate/issues/11).
 
-### Loop 2: after the fixes
+#### Loop 2: after the fixes
 
 Loop 1 showed that NC State's icons leave allergens out, so PackPlate now reads
 the ingredient lists itself and flags what the icons miss

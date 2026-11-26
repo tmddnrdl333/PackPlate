@@ -70,3 +70,36 @@ export function progress(plan: LocationPlan, goal: number): number {
   const percent = Math.floor((plan.protein_g / goal) * 100);
   return plan.status === "met" ? 100 : Math.min(99, percent);
 }
+
+// When no location can reach the goal (Project 3 M0 descope): the student's
+// goal is beyond what any one location's menu offers them that day. The M0
+// eval found every missed day was like this, mostly for vegetarian and vegan
+// students with high goals, so the page says so and offers a goal that works.
+export interface GoalWarning {
+  goal: number; // what the student asked for
+  reachable: number; // the most protein any one location offers them, in g
+  location: string; // where that is
+  suggested: number; // the highest whole-gram goal that location fully meets
+  plantBased: boolean; // vegetarian or vegan
+}
+
+export function goalWarning(
+  plans: LocationPlan[],
+  goal: number,
+  diets: readonly Diet[],
+): GoalWarning | null {
+  if (plans.some((p) => p.status === "met")) return null;
+  let top: LocationPlan | null = null;
+  for (const plan of plans) {
+    if (plan.status !== "short") continue;
+    if (top === null || plan.protein_g > top.protein_g) top = plan;
+  }
+  if (top === null) return null;
+  return {
+    goal,
+    reachable: top.protein_g,
+    location: top.location_name,
+    suggested: Math.floor(top.protein_g),
+    plantBased: diets.includes("vegan") || diets.includes("vegetarian"),
+  };
+}
