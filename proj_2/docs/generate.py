@@ -26,6 +26,7 @@ PACKAGES = [
     ("Scraper", "ingestion", "ingestion"),
     ("M0 loop 1", "eval", "eval"),
     ("M0 loop 2", "eval_loop2", "eval_loop2"),
+    ("P3 M0 planner eval", "eval_planner", "eval_planner"),
 ]
 SKIP_DIRS = {"tests", "migrations", "__pycache__"}
 MISSING = "_No description yet._"

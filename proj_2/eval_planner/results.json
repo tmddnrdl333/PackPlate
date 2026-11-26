@@ -1,0 +1,112 @@
+{
+ "claim": "For simulated students with at least one dietary restriction, the planner finds a plan at one location that meets their daily protein goal under their calorie limit, using only dishes PackPlate marks safe and labels one serving can have, on at least 90% of student-days.",
+ "useful": {
+  "student_days": 1200,
+  "students": 200,
+  "days": [
+   "2026-10-12",
+   "2026-10-13",
+   "2026-10-14",
+   "2026-10-20",
+   "2026-10-21",
+   "2026-10-22"
+  ],
+  "met": 1014,
+  "met_rate": 0.845,
+  "met_rate_counting_implausible_labels": 0.845,
+  "baseline_single_dish_rate": 0.0267,
+  "missed": 186,
+  "missed_with_goal_warning": 186,
+  "goal_warning_coverage": 1.0,
+  "by_group": {
+   "other": {
+    "student_days": 876,
+    "met_rate": 0.9498,
+    "baseline_rate": 0.0365
+   },
+   "vegan": {
+    "student_days": 54,
+    "met_rate": 0.5741,
+    "baseline_rate": 0.0
+   },
+   "vegetarian": {
+    "student_days": 270,
+    "met_rate": 0.5593,
+    "baseline_rate": 0.0
+   }
+  },
+  "by_goal": {
+   "60-90 g": {
+    "student_days": 366,
+    "met_rate": 1.0,
+    "baseline_rate": 0.0874
+   },
+   "91-120 g": {
+    "student_days": 450,
+    "met_rate": 0.8778,
+    "baseline_rate": 0.0
+   },
+   "121-150 g": {
+    "student_days": 384,
+    "met_rate": 0.6589,
+    "baseline_rate": 0.0
+   }
+  },
+  "by_day": {
+   "2026-10-12": {
+    "student_days": 200,
+    "met_rate": 0.85,
+    "baseline_rate": 0.005
+   },
+   "2026-10-13": {
+    "student_days": 200,
+    "met_rate": 0.84,
+    "baseline_rate": 0.005
+   },
+   "2026-10-14": {
+    "student_days": 200,
+    "met_rate": 0.865,
+    "baseline_rate": 0.005
+   },
+   "2026-10-20": {
+    "student_days": 200,
+    "met_rate": 0.84,
+    "baseline_rate": 0.035
+   },
+   "2026-10-21": {
+    "student_days": 200,
+    "met_rate": 0.84,
+    "baseline_rate": 0.075
+   },
+   "2026-10-22": {
+    "student_days": 200,
+    "met_rate": 0.835,
+    "baseline_rate": 0.035
+   }
+  }
+ },
+ "safe": {
+  "unsafe_planned_dishes": 0,
+  "unsafe_examples": [],
+  "hand_check": {
+   "pairs_in_pool": 2109,
+   "pairs_left_out_no_ingredients": 49,
+   "sampled": 50,
+   "not_checked_yet": 0,
+   "ok": 44,
+   "missed": 0,
+   "unclear": 6,
+   "miss_rate_upper_bound_95": 0.0658,
+   "missed_pairs": []
+  }
+ },
+ "targets": {
+  "useful_min_rate": 0.9,
+  "safe_max_unsafe_auto": 0,
+  "safe_max_missed": 0
+ },
+ "verdicts": {
+  "useful": "MISSED",
+  "safe": "MET"
+ }
+}

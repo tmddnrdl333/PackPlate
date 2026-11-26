@@ -1,0 +1,20 @@
+{
+ "about": "Settings for the Project 3 M0 planner eval (docs/p3-m0-planner-eval.md). Simulated students, not real ones. Each student is drawn with the restriction rates in eval_loop2/simulation.json (published US rates, sources there) and kept only if they have at least one restriction, because the claim is about restricted students. Each student keeps one protein goal and one calorie limit for all six days. Targets were written in the plan before any run and are not changed by results.",
+ "seed": 3,
+ "students": 200,
+ "protein_goal_g": [60, 150],
+ "max_calories": [1800, 2800],
+ "calorie_step": 100,
+ "max_items": 6,
+ "plausible_label": {
+  "about": "A planned dish with a label one serving can't have makes the plan unusable: NC State sometimes attaches a whole pan or case label to a dish (Sliced Mushrooms 162 g protein, Philly-Style Chicken 769 g). Protein has 4 kcal per gram, so protein_g * 4 can't exceed calories.",
+  "max_protein_g": 100,
+  "max_calories": 2000
+ },
+ "targets": {
+  "useful_min_rate": 0.9,
+  "safe_max_unsafe_auto": 0,
+  "safe_max_missed": 0
+ },
+ "hand_check": {"size": 50, "seed": 2026}
+}
